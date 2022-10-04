@@ -6,7 +6,6 @@ import { CloseButton } from "../input/CloseButton";
 import { IconButton } from "../input/IconButton";
 import { ReactComponent as StarIcon } from "../icons/Star.svg";
 import { ReactComponent as DesktopIcon } from "../icons/Desktop.svg";
-import { ReactComponent as DiscordIcon } from "../icons/Discord.svg";
 import { ReactComponent as PhoneIcon } from "../icons/Phone.svg";
 import { ReactComponent as VRIcon } from "../icons/VR.svg";
 import { ReactComponent as VolumeOffIcon } from "../icons/VolumeOff.svg";
@@ -34,8 +33,6 @@ function getDeviceIconComponent(ctx) {
   if (ctx) {
     if (ctx.hmd) {
       return VRIcon;
-    } else if (ctx.discord) {
-      return DiscordIcon;
     } else if (ctx.mobile) {
       return PhoneIcon;
     }

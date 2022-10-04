@@ -1,13 +1,11 @@
 import React, { Component, useEffect } from "react";
 import PropTypes from "prop-types";
 import classNames from "classnames";
-import copy from "copy-to-clipboard";
 import { FormattedMessage } from "react-intl";
 import screenfull from "screenfull";
 
 import configs from "../utils/configs";
 import { VR_DEVICE_AVAILABILITY } from "../utils/vr-caps-detect";
-import { canShare } from "../utils/share";
 import styles from "../assets/stylesheets/ui-root.scss";
 import styleUtils from "./styles/style-utils.scss";
 import { ReactAudioContext } from "./wrap-with-audio";
@@ -21,11 +19,9 @@ import {
 import StateRoute from "./state-route.js";
 import { getPresenceProfileForSession, hubUrl } from "../utils/phoenix-utils";
 import { getMicrophonePresences } from "../utils/microphone-presence";
-import { getCurrentStreamer } from "../utils/component-utils";
 import { isIOS } from "../utils/is-mobile";
 
 import ProfileEntryPanel from "./profile-entry-panel";
-import MediaBrowserContainer from "./media-browser";
 
 import EntryStartPanel from "./entry-start-panel.js";
 import AvatarEditor from "./avatar-editor";
@@ -34,8 +30,7 @@ import PresenceLog from "./presence-log.js";
 import PreloadOverlay from "./preload-overlay.js";
 import RTCDebugPanel from "./debug-panel/RtcDebugPanel.js";
 import { showFullScreenIfAvailable, showFullScreenIfWasFullScreen } from "../utils/fullscreen";
-import { handleExitTo2DInterstitial, exit2DInterstitialAndEnterVR, isIn2DInterstitial } from "../utils/vr-interstitial";
-import maskEmail from "../utils/mask-email";
+import { exit2DInterstitialAndEnterVR, isIn2DInterstitial } from "../utils/vr-interstitial";
 
 import qsTruthy from "../utils/qs_truthy";
 import { LoadingScreenContainer } from "./room/LoadingScreenContainer";
@@ -47,54 +42,29 @@ import { ToolbarButton } from "./input/ToolbarButton";
 import { RoomEntryModal } from "./room/RoomEntryModal";
 import { EnterOnDeviceModal } from "./room/EnterOnDeviceModal";
 import { MicSetupModalContainer } from "./room/MicSetupModalContainer";
-import { InvitePopoverContainer } from "./room/InvitePopoverContainer";
 import { MoreMenuPopoverButton, CompactMoreMenuButton, MoreMenuContextProvider } from "./room/MoreMenuPopover";
 import { ChatSidebarContainer, ChatContextProvider, ChatToolbarButtonContainer } from "./room/ChatSidebarContainer";
-import { ContentMenu, PeopleMenuButton, ObjectsMenuButton, ECSDebugMenuButton } from "./room/ContentMenu";
-import { ReactComponent as CameraIcon } from "./icons/Camera.svg";
-import { ReactComponent as AvatarIcon } from "./icons/Avatar.svg";
-import { ReactComponent as AddIcon } from "./icons/Add.svg";
-import { ReactComponent as DeleteIcon } from "./icons/Delete.svg";
-import { ReactComponent as FavoritesIcon } from "./icons/Favorites.svg";
-import { ReactComponent as StarOutlineIcon } from "./icons/StarOutline.svg";
-import { ReactComponent as StarIcon } from "./icons/Star.svg";
+import { ContentMenu, PeopleMenuButton } from "./room/ContentMenu";
 import { ReactComponent as SettingsIcon } from "./icons/Settings.svg";
-import { ReactComponent as WarningCircleIcon } from "./icons/WarningCircle.svg";
-import { ReactComponent as HomeIcon } from "./icons/Home.svg";
-import { ReactComponent as TextDocumentIcon } from "./icons/TextDocument.svg";
-import { ReactComponent as SupportIcon } from "./icons/Support.svg";
-import { ReactComponent as ShieldIcon } from "./icons/Shield.svg";
-import { ReactComponent as DiscordIcon } from "./icons/Discord.svg";
 import { ReactComponent as VRIcon } from "./icons/VR.svg";
 import { ReactComponent as LeaveIcon } from "./icons/Leave.svg";
 import { ReactComponent as EnterIcon } from "./icons/Enter.svg";
-import { ReactComponent as InviteIcon } from "./icons/Invite.svg";
 import { PeopleSidebarContainer, userFromPresence } from "./room/PeopleSidebarContainer";
 import { ObjectListProvider } from "./room/useObjectList";
-import { ObjectsSidebarContainer } from "./room/ObjectsSidebarContainer";
 import { ObjectMenuContainer } from "./room/ObjectMenuContainer";
 import { useCssBreakpoints } from "react-use-css-breakpoints";
-import { PlacePopoverContainer } from "./room/PlacePopoverContainer";
-import { SharePopoverContainer } from "./room/SharePopoverContainer";
 import { AudioPopoverContainer } from "./room/AudioPopoverContainer";
-import { ReactionPopoverContainer } from "./room/ReactionPopoverContainer";
 import { SafariMicModal } from "./room/SafariMicModal";
 import { RoomSignInModalContainer } from "./auth/RoomSignInModalContainer";
 import { SignInStep } from "./auth/SignInModal";
 import { LeaveReason, LeaveRoomModal } from "./room/LeaveRoomModal";
-import { RoomSidebar } from "./room/RoomSidebar";
-import { RoomSettingsSidebarContainer } from "./room/RoomSettingsSidebarContainer";
 import { AutoExitWarningModal, AutoExitReason } from "./room/AutoExitWarningModal";
 import { ExitReason } from "./room/ExitedRoomScreen";
 import { UserProfileSidebarContainer } from "./room/UserProfileSidebarContainer";
-import { CloseRoomModal } from "./room/CloseRoomModal";
 import { WebVRUnsupportedModal } from "./room/WebVRUnsupportedModal";
-import { TweetModalContainer } from "./room/TweetModalContainer";
 import { TipContainer, FullscreenTip } from "./room/TipContainer";
-import { SpectatingLabel } from "./room/SpectatingLabel";
 import { SignInMessages } from "./auth/SignInModal";
 import { MediaDevicesEvents } from "../utils/media-devices-utils";
-import { TERMS, PRIVACY } from "../constants";
 import { ECSDebugSidebarContainer } from "./debug-panel/ECSSidebar";
 
 const avatarEditorDebug = qsTruthy("avatarEditorDebug");
@@ -373,8 +343,6 @@ class UIRoot extends Component {
     }
 
     this.playerRig = scene.querySelector("#avatar-rig");
-
-    scene.addEventListener("action_media_tweet", this.onTweet);
   }
 
   UNSAFE_componentWillMount() {
@@ -387,7 +355,6 @@ class UIRoot extends Component {
     this.props.scene.removeEventListener("share_video_enabled", this.onShareVideoEnabled);
     this.props.scene.removeEventListener("share_video_disabled", this.onShareVideoDisabled);
     this.props.scene.removeEventListener("share_video_failed", this.onShareVideoFailed);
-    this.props.scene.removeEventListener("action_media_tweet", this.onTweet);
     this.props.store.removeEventListener("statechanged", this.storeUpdated);
     window.removeEventListener("concurrentload", this.onConcurrentLoad);
     window.removeEventListener("idle_detected", this.onIdleDetected);
@@ -405,14 +372,13 @@ class UIRoot extends Component {
       step: SignInStep.submit,
       message: signInMessage,
       onSubmitEmail: async email => {
-        const { authComplete } = await authChannel.startAuthentication(email, this.props.hubChannel);
 
         this.showNonHistoriedDialog(RoomSignInModalContainer, {
           step: SignInStep.waitForVerification,
           onClose: onContinueAfterSignIn || this.closeDialog
         });
 
-        await authComplete;
+        alert("Wait auth")
 
         this.setState({ signedIn: true });
         this.showNonHistoriedDialog(RoomSignInModalContainer, {
@@ -657,39 +623,11 @@ class UIRoot extends Component {
     });
   };
 
-  toggleStreamerMode = () => {
-    const isStreaming = !this.state.isStreaming;
-    this.props.scene.systems["hubs-systems"].characterController.fly = isStreaming;
-
-    if (isStreaming) {
-      this.props.hubChannel.beginStreaming();
-    } else {
-      this.props.hubChannel.endStreaming();
-    }
-
-    this.setState({ isStreaming });
-  };
-
   renderDialog = (DialogClass, props = {}) => <DialogClass {...{ onClose: this.closeDialog, ...props }} />;
 
   signOut = async () => {
     await this.props.authChannel.signOut(this.props.hubChannel);
     this.setState({ signedIn: false });
-  };
-
-  onMiniInviteClicked = () => {
-    const link = `https://${configs.SHORTLINK_DOMAIN}/${this.props.hub.hub_id}`;
-
-    this.setState({ miniInviteActivated: true });
-    setTimeout(() => {
-      this.setState({ miniInviteActivated: false });
-    }, 5000);
-
-    if (canShare()) {
-      navigator.share({ title: document.title, url: link });
-    } else {
-      copy(link);
-    }
   };
 
   sendMessage = msg => {
@@ -714,22 +652,6 @@ class UIRoot extends Component {
     }
 
     return false;
-  };
-
-  onTweet = ({ detail }) => {
-    handleExitTo2DInterstitial(true, () => {}).then(() => {
-      this.props.performConditionalSignIn(
-        () => this.props.hubChannel.signedIn,
-        () => {
-          this.showNonHistoriedDialog(TweetModalContainer, {
-            hubChannel: this.props.hubChannel,
-            isAdmin: configs.isAdmin(),
-            ...detail
-          });
-        },
-        SignInMessages.tweet
-      );
-    });
   };
 
   onChangeScene = () => {
@@ -824,7 +746,6 @@ class UIRoot extends Component {
           onEnterOnDevice={() => this.attemptLink()}
           showSpectate={!this.state.waitingOnAudio}
           onSpectate={() => this.setState({ watching: true })}
-          showOptions={this.props.hubChannel.canOrWillIfCreator("update_hub")}
           onOptions={() => {
             this.props.performConditionalSignIn(
               () => this.props.hubChannel.can("update_hub"),
@@ -1064,38 +985,13 @@ class UIRoot extends Component {
 
     const presenceLogEntries = this.props.presenceLogEntries || [];
 
-    const mediaSource = this.props.mediaSearchStore.getUrlMediaSource(this.props.history.location);
-
-    // Allow scene picker pre-entry, otherwise wait until entry
-    const showMediaBrowser =
-      mediaSource && (["scenes", "avatars", "favorites"].includes(mediaSource) || this.state.entered);
-
     const streaming = this.state.isStreaming;
-
-    const showObjectList = enteredOrWatching;
-    const showECSObjectsMenuButton = qsTruthy("ecsDebug");
-
-    const streamer = getCurrentStreamer();
-    const streamerName = streamer && streamer.displayName;
-
     const renderEntryFlow = (!enteredOrWatching && this.props.hub) || this.isWaitingForAutoExit();
-
-    const canCreateRoom = !configs.feature("disable_room_creation") || configs.isAdmin();
-    const canCloseRoom = this.props.hubChannel && !!this.props.hubChannel.canOrWillIfCreator("close_hub");
-    const isModerator = this.props.hubChannel && this.props.hubChannel.canOrWillIfCreator("kick_users") && !isMobileVR;
 
     const moreMenu = [
       {
         id: "user",
-        label: !this.state.signedIn ? (
-          <FormattedMessage id="more-menu.not-signed-in" defaultMessage="You are not signed in" />
-        ) : (
-          <FormattedMessage
-            id="more-menu.you-signed-in-as"
-            defaultMessage="Signed in as: {email}"
-            values={{ email: maskEmail(this.props.store.state.credentials.email) }}
-          />
-        ),
+        label: "",
         items: [
           this.state.signedIn
             ? {
@@ -1113,36 +1009,6 @@ class UIRoot extends Component {
                 icon: EnterIcon,
                 onClick: () => this.showContextualSignInDialog()
               },
-          canCreateRoom && {
-            id: "create-room",
-            label: <FormattedMessage id="more-menu.create-room" defaultMessage="Create Room" />,
-            icon: AddIcon,
-            onClick: () =>
-              this.showNonHistoriedDialog(LeaveRoomModal, {
-                destinationUrl: "/",
-                reason: LeaveReason.createRoom
-              })
-          },
-          {
-            id: "user-profile",
-            label: <FormattedMessage id="more-menu.profile" defaultMessage="Change Name & Avatar" />,
-            icon: AvatarIcon,
-            onClick: () => this.setSidebar("profile")
-          },
-          {
-            id: "favorite-rooms",
-            label: <FormattedMessage id="more-menu.favorite-rooms" defaultMessage="Favorite Rooms" />,
-            icon: FavoritesIcon,
-            onClick: () =>
-              this.props.performConditionalSignIn(
-                () => this.props.hubChannel.signedIn,
-                () => {
-                  showFullScreenIfAvailable();
-                  this.props.mediaSearchStore.sourceNavigateWithNoNav("favorites", "use");
-                },
-                SignInMessages.favoriteRooms
-              )
-          },
           {
             id: "preferences",
             label: <FormattedMessage id="more-menu.preferences" defaultMessage="Preferences" />,
@@ -1151,133 +1017,6 @@ class UIRoot extends Component {
           }
         ].filter(item => item)
       },
-      {
-        id: "room",
-        label: <FormattedMessage id="more-menu.room" defaultMessage="Room" />,
-        items: [
-          {
-            id: "room-info",
-            label: <FormattedMessage id="more-menu.room-info" defaultMessage="Room Info and Settings" />,
-            icon: HomeIcon,
-            onClick: () => this.setSidebar("room-info")
-          },
-          (this.props.breakpoint === "sm" || this.props.breakpoint === "md") &&
-            (this.props.hub.entry_mode !== "invite" || this.props.hubChannel.can("update_hub")) && {
-              id: "invite",
-              label: <FormattedMessage id="more-menu.invite" defaultMessage="Invite" />,
-              icon: InviteIcon,
-              onClick: () => this.props.scene.emit("action_invite")
-            },
-          this.isFavorited()
-            ? {
-                id: "unfavorite-room",
-                label: <FormattedMessage id="more-menu.unfavorite-room" defaultMessage="Unfavorite Room" />,
-                icon: StarIcon,
-                onClick: () => this.toggleFavorited()
-              }
-            : {
-                id: "favorite-room",
-                label: <FormattedMessage id="more-menu.favorite-room" defaultMessage="Favorite Room" />,
-                icon: StarOutlineIcon,
-                onClick: () => this.toggleFavorited()
-              },
-          isModerator &&
-            entered && {
-              id: "streamer-mode",
-              label: streaming ? (
-                <FormattedMessage id="more-menu.exit-streamer-mode" defaultMessage="Exit Streamer Mode" />
-              ) : (
-                <FormattedMessage id="more-menu.enter-streamer-mode" defaultMessage="Enter Streamer Mode" />
-              ),
-              icon: CameraIcon,
-              onClick: () => this.toggleStreamerMode()
-            },
-          (this.props.breakpoint === "sm" || this.props.breakpoint === "md") &&
-            entered && {
-              id: "leave-room",
-              label: <FormattedMessage id="more-menu.enter-leave-room" defaultMessage="Leave Room" />,
-              icon: LeaveIcon,
-              onClick: () => {
-                this.showNonHistoriedDialog(LeaveRoomModal, {
-                  destinationUrl: "/",
-                  reason: LeaveReason.leaveRoom
-                });
-              }
-            },
-          canCloseRoom && {
-            id: "close-room",
-            label: <FormattedMessage id="more-menu.close-room" defaultMessage="Close Room" />,
-            icon: DeleteIcon,
-            onClick: () =>
-              this.props.performConditionalSignIn(
-                () => this.props.hubChannel.can("update_hub"),
-                () => {
-                  this.showNonHistoriedDialog(CloseRoomModal, {
-                    roomName: this.props.hub.name,
-                    onConfirm: () => {
-                      this.props.hubChannel.closeHub();
-                    }
-                  });
-                },
-                SignInMessages.closeRoom
-              )
-          }
-        ].filter(item => item)
-      },
-      {
-        id: "support",
-        label: <FormattedMessage id="more-menu.support" defaultMessage="Support" />,
-        items: [
-          configs.feature("show_community_link") && {
-            id: "community",
-            label: <FormattedMessage id="more-menu.community" defaultMessage="Community" />,
-            icon: DiscordIcon,
-            href: configs.link("community", "https://discord.gg/dFJncWwHun")
-          },
-          configs.feature("show_issue_report_link") && {
-            id: "report-issue",
-            label: <FormattedMessage id="more-menu.report-issue" defaultMessage="Report Issue" />,
-            icon: WarningCircleIcon,
-            href: configs.link("issue_report", "https://hubs.mozilla.com/docs/help.html")
-          },
-          entered && {
-            id: "start-tour",
-            label: <FormattedMessage id="more-menu.start-tour" defaultMessage="Start Tour" />,
-            icon: SupportIcon,
-            onClick: () => this.props.scene.systems.tips.resetTips()
-          },
-          configs.feature("show_docs_link") && {
-            id: "help",
-            label: <FormattedMessage id="more-menu.help" defaultMessage="Help" />,
-            icon: SupportIcon,
-            href: configs.link("docs", "https://hubs.mozilla.com/docs")
-          },
-          configs.feature("show_controls_link") && {
-            id: "controls",
-            label: <FormattedMessage id="more-menu.controls" defaultMessage="Controls" />,
-            icon: SupportIcon,
-            href: configs.link("controls", "https://hubs.mozilla.com/docs/hubs-controls.html")
-          },
-          configs.feature("show_whats_new_link") && {
-            id: "whats-new",
-            label: <FormattedMessage id="more-menu.whats-new" defaultMessage="What's New" />,
-            icon: SupportIcon,
-            href: "/whats-new"
-          },
-          configs.feature("show_terms") && {
-            id: "tos",
-            label: <FormattedMessage id="more-menu.tos" defaultMessage="Terms of Service" />,
-            icon: TextDocumentIcon,
-            href: configs.link("terms_of_use", TERMS)
-          },
-          configs.feature("show_privacy") && {
-            id: "privacy",
-            label: <FormattedMessage id="more-menu.privacy" defaultMessage="Privacy Notice" />,
-            icon: ShieldIcon,
-            href: configs.link("privacy_notice", PRIVACY)
-          }
-        ].filter(item => item)
-      }
     ];
 
     return (
@@ -1322,27 +1061,6 @@ class UIRoot extends Component {
                 )}
               />
             )}
-            {!this.state.dialog && showMediaBrowser && (
-              <MediaBrowserContainer
-                history={this.props.history}
-                mediaSearchStore={this.props.mediaSearchStore}
-                hubChannel={this.props.hubChannel}
-                onMediaSearchResultEntrySelected={(entry, selectAction) => {
-                  if (entry.type === "room") {
-                    this.showNonHistoriedDialog(LeaveRoomModal, {
-                      destinationUrl: entry.url,
-                      reason: LeaveReason.joinRoom
-                    });
-                  } else {
-                    this.props.onMediaSearchResultEntrySelected(entry, selectAction);
-                  }
-                }}
-                performConditionalSignIn={this.props.performConditionalSignIn}
-                showNonHistoriedDialog={this.showNonHistoriedDialog}
-                store={this.props.store}
-                scene={this.props.scene}
-              />
-            )}
             {this.props.hub && (
               <RoomLayoutContainer
                 scene={this.props.scene}
@@ -1356,26 +1074,13 @@ class UIRoot extends Component {
                     {(!this.props.selectedObject ||
                       (this.props.breakpoint !== "sm" && this.props.breakpoint !== "md")) && (
                       <ContentMenu>
-                        {showObjectList && (
-                          <ObjectsMenuButton
-                            active={this.state.sidebarId === "objects"}
-                            onClick={() => this.toggleSidebar("objects")}
-                          />
-                        )}
                         <PeopleMenuButton
                           active={this.state.sidebarId === "people"}
                           onClick={() => this.toggleSidebar("people")}
                           presencecount={this.state.presenceCount}
                         />
-                        {showECSObjectsMenuButton && (
-                          <ECSDebugMenuButton
-                            active={this.state.sidebarId === "ecs-debug"}
-                            onClick={() => this.toggleSidebar("ecs-debug")}
-                          />
-                        )}
                       </ContentMenu>
                     )}
-                    {!entered && !streaming && !isMobile && streamerName && <SpectatingLabel name={streamerName} />}
                     {this.props.activeObject && (
                       <ObjectMenuContainer
                         hubChannel={this.props.hubChannel}
@@ -1435,12 +1140,6 @@ class UIRoot extends Component {
                           inputEffect={this.state.chatInputEffect}
                         />
                       )}
-                      {this.state.sidebarId === "objects" && (
-                        <ObjectsSidebarContainer
-                          hubChannel={this.props.hubChannel}
-                          onClose={() => this.setSidebar(null)}
-                        />
-                      )}
                       {this.state.sidebarId === "people" && (
                         <PeopleSidebarContainer
                           displayNameOverride={displayNameOverride}
@@ -1477,40 +1176,6 @@ class UIRoot extends Component {
                           showNonHistoriedDialog={this.showNonHistoriedDialog}
                         />
                       )}
-                      {this.state.sidebarId === "room-info" && (
-                        <RoomSidebar
-                          accountId={this.props.sessionId}
-                          room={this.props.hub}
-                          canEdit={this.props.hubChannel.canOrWillIfCreator("update_hub")}
-                          onEdit={() => {
-                            this.props.performConditionalSignIn(
-                              () => this.props.hubChannel.can("update_hub"),
-                              () => this.setSidebar("room-info-settings"),
-                              SignInMessages.roomSettings
-                            );
-                          }}
-                          onClose={() => this.setSidebar(null)}
-                          onChangeScene={this.onChangeScene}
-                        />
-                      )}
-                      {this.state.sidebarId === "room-info-settings" && (
-                        <RoomSettingsSidebarContainer
-                          room={this.props.hub}
-                          hubChannel={this.props.hubChannel}
-                          showBackButton
-                          onClose={() => this.setSidebar("room-info")}
-                          onChangeScene={this.onChangeScene}
-                        />
-                      )}
-                      {this.state.sidebarId === "room-settings" && (
-                        <RoomSettingsSidebarContainer
-                          room={this.props.hub}
-                          accountId={this.props.sessionId}
-                          hubChannel={this.props.hubChannel}
-                          onClose={() => this.setSidebar(null)}
-                          onChangeScene={this.onChangeScene}
-                        />
-                      )}
                       {this.state.sidebarId === "ecs-debug" && (
                         <ECSDebugSidebarContainer onClose={() => this.setSidebar(null)} />
                       )}
@@ -1519,12 +1184,7 @@ class UIRoot extends Component {
                 }
                 modal={this.state.dialog}
                 toolbarLeft={
-                  <InvitePopoverContainer
-                    hub={this.props.hub}
-                    hubChannel={this.props.hubChannel}
-                    scene={this.props.scene}
-                    store={this.props.store}
-                  />
+                  <></>
                 }
                 toolbarCenter={
                   <>
@@ -1551,19 +1211,6 @@ class UIRoot extends Component {
                     {entered && (
                       <>
                         <AudioPopoverContainer scene={this.props.scene} />
-                        <SharePopoverContainer scene={this.props.scene} hubChannel={this.props.hubChannel} />
-                        <PlacePopoverContainer
-                          scene={this.props.scene}
-                          hubChannel={this.props.hubChannel}
-                          mediaSearchStore={this.props.mediaSearchStore}
-                          showNonHistoriedDialog={this.showNonHistoriedDialog}
-                        />
-                        {this.props.hubChannel.can("spawn_emoji") && (
-                          <ReactionPopoverContainer
-                            scene={this.props.scene}
-                            initialPresence={getPresenceProfileForSession(this.props.presences, this.props.sessionId)}
-                          />
-                        )}
                       </>
                     )}
                     <ChatToolbarButtonContainer onClick={() => this.toggleSidebar("chat")} />

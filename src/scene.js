@@ -16,11 +16,10 @@ import "./components/scene-components";
 import "./components/debug";
 import "./systems/nav";
 
-import { connectToReticulum, fetchReticulumAuthenticated } from "./utils/phoenix-utils";
+import { fetchReticulumAuthenticated, fetchBackendAuthenticated } from "./utils/phoenix-utils";
 
 import ReactDOM from "react-dom";
 import React from "react";
-import jwtDecode from "jwt-decode";
 import SceneUI from "./react-components/scene-ui";
 import { disableiOSZoom } from "./utils/disable-ios-zoom";
 
@@ -82,25 +81,9 @@ const onReady = async () => {
   const gltfEl = document.createElement("a-entity");
   const camera = document.getElementById("camera");
 
-  connectToReticulum().then(socket => {
-    const joinParams = { hub_id: "scene" };
-
-    if (window.APP.store.state.credentials && window.APP.store.state.credentials.token) {
-      joinParams.token = window.APP.store.state.credentials.token;
-    }
-
-    const retPhxChannel = socket.channel("ret", joinParams);
-
-    retPhxChannel.join().receive("ok", () => {
-      retPhxChannel.push("refresh_perms_token").receive("ok", ({ perms_token }) => {
-        const perms = jwtDecode(perms_token);
-        remountUI({ showCreateRoom: !!perms.create_hub });
-
-        retPhxChannel.leave();
-        socket.disconnect();
-      });
-    });
-  });
+  fetchBackendAuthenticated(process.env.BACKEND_ENDPOINT_PERMISSIONS).then((me) => {
+    remountUI({ showCreateRoom: !!me.permissions.create_hub });
+  })
 
   const envSystem = new EnvironmentSystem(scene);
 

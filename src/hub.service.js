@@ -8,11 +8,7 @@ self.addEventListener("activate", function(e) {
 
 self.addEventListener("fetch", function() {});
 
-// Reticulum will inject an overrided app name.
-// eslint-disable-next-line prefer-const
 let appFullName = "";
-
-// DO NOT REMOVE/EDIT THIS COMMENT - META_TAGS
 
 self.addEventListener("push", function(e) {
   const payload = JSON.parse(e.data.text());

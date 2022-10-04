@@ -5,17 +5,13 @@ import {
   createHubChannelParams
 } from "./utils/hub-utils";
 import "./utils/debug-log";
-import configs from "./utils/configs";
 import "./utils/theme";
 
 import "core-js/stable";
 import "regenerator-runtime/runtime";
 
 console.log(
-  `App version: ${
-    configs.IS_LOCAL_OR_CUSTOM_CLIENT
-      ? `Custom client or local client (undeploy custom client to run build ${process.env.BUILD_VERSION})`
-      : process.env.BUILD_VERSION || "?"
+  `App version: ${process.env.BUILD_VERSION || "?"
   }`
 );
 
@@ -49,7 +45,8 @@ import {
   connectToReticulum,
   denoisePresence,
   presenceEventsForHub,
-  tryGetMatchingMeta
+  tryGetMatchingMeta,
+  fetchBackendAuthenticated
 } from "./utils/phoenix-utils";
 import { Presence } from "phoenix";
 import { emitter } from "./emitter";
@@ -57,7 +54,6 @@ import "./phoenix-adapter";
 
 import nextTick from "./utils/next-tick";
 import { addAnimationComponents } from "./utils/animation";
-import Cookies from "js-cookie";
 import { DIALOG_CONNECTION_ERROR_FATAL, DIALOG_CONNECTION_CONNECTED } from "./naf-dialog-adapter";
 import "./change-hub";
 
@@ -117,7 +113,6 @@ import "./components/follow-in-fov";
 import "./components/clone-media-button";
 import "./components/open-media-button";
 import "./components/refresh-media-button";
-import "./components/tweet-media-button";
 import "./components/remix-avatar-button";
 import "./components/transform-object-button";
 import "./components/scale-button";
@@ -196,7 +191,6 @@ renderAsEntity(APP.world, VideoMenuPrefab());
 const store = window.APP.store;
 store.update({ preferences: { shouldPromptForRefresh: false } }); // Clear flag that prompts for refresh from preference screen
 const mediaSearchStore = window.APP.mediaSearchStore;
-const OAUTH_FLOW_PERMS_TOKEN_KEY = "ret-oauth-flow-perms-token";
 const NOISY_OCCUPANT_COUNT = 30; // Above this # of occupants, we stop posting join/leaves/renames
 
 const qs = new URLSearchParams(location.search);
@@ -235,7 +229,6 @@ import detectConcurrentLoad from "./utils/concurrent-load-detector";
 import qsTruthy from "./utils/qs_truthy";
 import { WrappedIntlProvider } from "./react-components/wrapped-intl-provider";
 import { ExitReason } from "./react-components/room/ExitedRoomScreen";
-import { OAuthScreenContainer } from "./react-components/auth/OAuthScreenContainer";
 import { SignInMessages } from "./react-components/auth/SignInModal";
 import { ThemeProvider } from "./react-components/styles/theme";
 import { LogMessageType } from "./react-components/room/ChatSidebar";
@@ -245,19 +238,6 @@ const PHOENIX_RELIABLE_NAF = "phx-reliable";
 NAF.options.firstSyncSource = PHOENIX_RELIABLE_NAF;
 NAF.options.syncSource = PHOENIX_RELIABLE_NAF;
 
-let isOAuthModal = false;
-
-// OAuth popup handler
-// TODO: Replace with a new oauth callback route that has this postMessage script.
-try {
-  if (window.opener && window.opener.doingTwitterOAuth) {
-    window.opener.postMessage("oauth-successful");
-    isOAuthModal = true;
-    window.close();
-  }
-} catch (e) {
-  console.error("Exception in oauth processing code", e);
-}
 
 const isBotMode = qsTruthy("bot");
 const isTelemetryDisabled = qsTruthy("disable_telemetry");
@@ -269,9 +249,7 @@ if (!isBotMode && !isTelemetryDisabled) {
 
 disableiOSZoom();
 
-if (!isOAuthModal) {
-  detectConcurrentLoad();
-}
+detectConcurrentLoad();
 
 function setupLobbyCamera() {
   console.log("Setting up lobby camera");
@@ -310,8 +288,7 @@ const qsVREntryType = qs.get("vr_entry_type");
 
 function mountUI(props = {}) {
   const scene = document.querySelector("a-scene");
-  const disableAutoExitOnIdle =
-    qsTruthy("allow_idle") || (process.env.NODE_ENV === "development" && !qs.get("idle_timeout"));
+  const disableAutoExitOnIdle = process.env.NODE_ENV === "development";
   const forcedVREntryType = qsVREntryType;
 
   ReactDOM.render(
@@ -320,9 +297,7 @@ function mountUI(props = {}) {
         <Router history={history}>
           <Route
             render={routeProps =>
-              props.showOAuthScreen ? (
-                <OAuthScreenContainer oauthInfo={props.oauthInfo} />
-              ) : props.roomUnavailableReason ? (
+              props.roomUnavailableReason ? (
                 <ExitedRoomScreenContainer reason={props.roomUnavailableReason} />
               ) : (
                 <UIRoot
@@ -567,7 +542,7 @@ function handleHubChannelJoined(entryManager, hubChannel, messageDispatch, data)
     () => {
       // Append objects once we are in the NAF room since ownership may be taken.
       const objectsScene = document.querySelector("#objects-scene");
-      const objectsUrl = getReticulumFetchUrl(`/${hub.hub_id}/objects.gltf`);
+      const objectsUrl = getReticulumFetchUrl(`/room/${hub.hub_id}/objects.gltf`);
       const objectsEl = document.createElement("a-entity");
 
       objectsEl.setAttribute("gltf-model-plus", { src: objectsUrl, useCache: false, inflate: true });
@@ -593,6 +568,8 @@ function handleHubChannelJoined(entryManager, hubChannel, messageDispatch, data)
       console.log("Loading environment and connecting to dialog servers");
 
       updateEnvironmentForHub(hub, entryManager);
+
+      console.log("ddd", data);
 
       // Disconnect in case this is a re-entry
       APP.dialog.disconnect();
@@ -663,10 +640,6 @@ async function runBotMode(scene, entryManager) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (isOAuthModal) {
-    return;
-  }
-
   await store.initProfile();
 
   const canvas = document.querySelector(".a-canvas");
@@ -692,15 +665,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const hubId = getCurrentHubId();
   console.log(`Hub ID: ${hubId}`);
 
-  const shouldRedirectToSignInPage =
-    // Default room won't work if account is required to access
-    !configs.feature("default_room_id") &&
-    configs.feature("require_account_for_join") &&
-    !(store.state.credentials && store.state.credentials.token);
+  const shouldRedirectToSignInPage = !(store.state.credentials && store.state.credentials.token);
   if (shouldRedirectToSignInPage) {
-    document.location = `/?sign_in&sign_in_destination=hub&sign_in_destination_url=${encodeURIComponent(
-      document.location.toString()
-    )}`;
+    document.location = `${process.env.SIGNIN}`;
+    return;
   }
 
   const subscriptions = new Subscriptions(hubId);
@@ -1031,15 +999,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const pushSubscriptionEndpoint = await subscriptions.getCurrentEndpoint();
 
-  APP.hubChannelParamsForPermsToken = permsToken => {
+  APP.hubChannelParamsForPermsToken = () => {
     return createHubChannelParams({
       profile: store.state.profile,
       pushSubscriptionEndpoint,
-      permsToken,
       isMobile,
       isMobileVR,
       isEmbed,
-      hubInviteId: qs.get("hub_invite_id"),
       authToken: store.state.credentials && store.state.credentials.token
     });
   };
@@ -1110,11 +1076,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   APP.messageDispatch = messageDispatch;
   document.getElementById("avatar-rig").messageDispatch = messageDispatch;
 
-  const oauthFlowPermsToken = Cookies.get(OAUTH_FLOW_PERMS_TOKEN_KEY);
-  if (oauthFlowPermsToken) {
-    Cookies.remove(OAUTH_FLOW_PERMS_TOKEN_KEY);
-  }
-  const hubPhxChannel = socket.channel(`hub:${hubId}`, APP.hubChannelParamsForPermsToken(oauthFlowPermsToken));
+  const hubPhxChannel = socket.channel(`hub:${hubId}`, APP.hubChannelParamsForPermsToken());
   hubChannel.channel = hubPhxChannel;
   hubChannel.presence = new Presence(hubPhxChannel);
   const { rawOnJoin, rawOnLeave } = denoisePresence(presenceEventsForHub(events));
@@ -1241,14 +1203,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       socket.params().session_id = data.session_id;
       socket.params().session_token = data.session_token;
 
-      const permsToken = oauthFlowPermsToken || data.perms_token;
-      hubChannel.setPermissionsFromToken(permsToken);
+      const permissions = (await fetchBackendAuthenticated(process.env.BACKEND_ENDPOINT_PERMISSIONS)).permissions;
+      hubChannel.setPermissionsFromToken(permissions);
 
       subscriptions.setHubChannel(hubChannel);
       subscriptions.setSubscribed(data.subscriptions.web_push);
 
       remountUI({
-        hubIsBound: data.hub_requires_oauth,
+        hubIsBound: true,
         initialIsFavorited: data.subscriptions.favorites
       });
 

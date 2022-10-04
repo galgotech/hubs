@@ -3,12 +3,8 @@ import PropTypes from "prop-types";
 import classNames from "classnames";
 import { FormattedMessage, injectIntl } from "react-intl";
 import configs from "../utils/configs";
-import IfFeature from "./if-feature";
 import styles from "../assets/stylesheets/scene-ui.scss";
-import { createAndRedirectToNewHub, getReticulumFetchUrl } from "../utils/phoenix-utils";
-import { ReactComponent as Twitter } from "./icons/Twitter.svg";
-import { ReactComponent as CodeBranch } from "./icons/CodeBranch.svg";
-import { ReactComponent as Pen } from "./icons/Pen.svg";
+import { createAndRedirectToNewHub } from "../utils/phoenix-utils";
 import { AppLogo } from "./misc/AppLogo";
 
 import { useResizeViewport } from "./room/useResizeViewport";
@@ -33,7 +29,6 @@ class SceneUI extends Component {
     sceneAllowRemixing: PropTypes.bool,
     showCreateRoom: PropTypes.bool,
     unavailable: PropTypes.bool,
-    isOwner: PropTypes.bool,
     parentScene: PropTypes.object
   };
 
@@ -77,22 +72,7 @@ class SceneUI extends Component {
       );
     }
 
-    const { sceneAllowRemixing, isOwner, sceneProjectId, parentScene, sceneId, intl } = this.props;
-    const sceneUrl = [location.protocol, "//", location.host, location.pathname].join("");
-    const tweetText = intl.formatMessage(
-      {
-        id: "scene-page.default-tweet",
-        defaultMessage: "{sceneName} in {shareHashtag}"
-      },
-      {
-        sceneName: this.props.sceneName,
-        shareHashtag: configs.translation("share-hashtag")
-      }
-    );
-    const tweetLink = `https://twitter.com/share?url=${encodeURIComponent(sceneUrl)}&text=${encodeURIComponent(
-      tweetText
-    )}`;
-
+    const { parentScene, intl } = this.props;
     const unknown = intl.formatMessage({ id: "scene-page.unknown", defaultMessage: "unknown" });
 
     let attributions;
@@ -231,45 +211,6 @@ class SceneUI extends Component {
                   <FormattedMessage id="scene-page.create-button" defaultMessage="Create a room with this scene" />
                 </button>
               )}
-              <IfFeature name="enable_spoke">
-                {isOwner && sceneProjectId ? (
-                  <a
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    href={getReticulumFetchUrl(`/spoke/projects/${sceneProjectId}`)}
-                    className={styles.scenePreviewButton}
-                  >
-                    <Pen />
-                    <FormattedMessage
-                      id="scene-page.edit-button"
-                      defaultMessage="Edit in {editorName}"
-                      values={{ editorName: configs.translation("editor-name") }}
-                    />
-                  </a>
-                ) : (
-                  sceneAllowRemixing && (
-                    <a
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      href={getReticulumFetchUrl(`/spoke/projects/new?sceneId=${sceneId}`)}
-                      className={styles.scenePreviewButton}
-                    >
-                      <CodeBranch />
-                      <FormattedMessage
-                        id="scene-page.remix-button"
-                        defaultMessage="Remix in {editorName}"
-                        values={{ editorName: configs.translation("editor-name") }}
-                      />
-                    </a>
-                  )
-                )}
-              </IfFeature>
-              <a href={tweetLink} rel="noopener noreferrer" target="_blank" className={styles.scenePreviewButton}>
-                <Twitter />
-                <div>
-                  <FormattedMessage id="scene-page.tweet-button" defaultMessage="Share on Twitter" />
-                </div>
-              </a>
             </div>
           </div>
           <div className={styles.info}>

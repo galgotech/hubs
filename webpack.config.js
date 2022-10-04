@@ -1,7 +1,6 @@
 const dotenv = require("dotenv");
 const fs = require("fs");
 const path = require("path");
-const selfsigned = require("selfsigned");
 const webpack = require("webpack");
 const cors = require("cors");
 const HTMLWebpackPlugin = require("html-webpack-plugin");
@@ -13,54 +12,6 @@ const fetch = require("node-fetch");
 const packageLock = require("./package-lock.json");
 const request = require("request");
 const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
-
-function createHTTPSConfig() {
-  // Generate certs for the local webpack-dev-server.
-  if (fs.existsSync(path.join(__dirname, "certs"))) {
-    const key = fs.readFileSync(path.join(__dirname, "certs", "key.pem"));
-    const cert = fs.readFileSync(path.join(__dirname, "certs", "cert.pem"));
-
-    return { key, cert };
-  } else {
-    const pems = selfsigned.generate(
-      [
-        {
-          name: "commonName",
-          value: "localhost"
-        }
-      ],
-      {
-        days: 365,
-        keySize: 2048,
-        algorithm: "sha256",
-        extensions: [
-          {
-            name: "subjectAltName",
-            altNames: [
-              {
-                type: 2,
-                value: "localhost"
-              },
-              {
-                type: 2,
-                value: "hubs.local"
-              }
-            ]
-          }
-        ]
-      }
-    );
-
-    fs.mkdirSync(path.join(__dirname, "certs"));
-    fs.writeFileSync(path.join(__dirname, "certs", "cert.pem"), pems.cert);
-    fs.writeFileSync(path.join(__dirname, "certs", "key.pem"), pems.private);
-
-    return {
-      key: pems.private,
-      cert: pems.cert
-    };
-  }
-}
 
 function getModuleDependencies(moduleName) {
   const deps = packageLock.dependencies;
@@ -123,11 +74,7 @@ function createDefaultAppConfig() {
     // Enable all features with a boolean type
     if (categoryName === "features") {
       for (const [key, schema] of Object.entries(category)) {
-        if (key === "require_account_for_join" || key === "disable_room_creation") {
-          appConfig[categoryName][key] = false;
-        } else {
-          appConfig[categoryName][key] = schema.type === "boolean" ? true : null;
-        }
+        appConfig[categoryName][key] = schema.type === "boolean" ? true : null;
       }
     }
   }
@@ -139,58 +86,6 @@ function createDefaultAppConfig() {
     const themes = JSON.parse(themesString);
     appConfig.theme.themes = themes;
   }
-
-  return appConfig;
-}
-
-async function fetchAppConfigAndEnvironmentVars() {
-  const { internalIpV4 } = await import("internal-ip");
-
-  if (!fs.existsSync(".ret.credentials")) {
-    throw new Error("Not logged in to Hubs Cloud. Run `npm run login` first.");
-  }
-
-  const { host, token } = JSON.parse(fs.readFileSync(".ret.credentials"));
-
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json"
-  };
-
-  // Load the Hubs Cloud instance's app config in development
-  const appConfigsResponse = await fetch(`https://${host}/api/v1/app_configs`, { headers });
-
-  if (!appConfigsResponse.ok) {
-    throw new Error(`Error fetching Hubs Cloud config "${appConfigsResponse.statusText}"`);
-  }
-
-  const appConfig = await appConfigsResponse.json();
-  if (appConfig.theme?.themes) {
-    appConfig.theme.themes = JSON.parse(appConfig.theme.themes);
-  }
-
-  // dev.reticulum.io doesn't run ita
-  if (host === "dev.reticulum.io") {
-    return appConfig;
-  }
-
-  const hubsConfigsResponse = await fetch(`https://${host}/api/ita/configs/hubs`, { headers });
-
-  const hubsConfigs = await hubsConfigsResponse.json();
-
-  if (!hubsConfigsResponse.ok) {
-    throw new Error(`Error fetching Hubs Cloud config "${hubsConfigsResponse.statusText}"`);
-  }
-
-  const { shortlink_domain, thumbnail_server } = hubsConfigs.general;
-
-  const localIp = process.env.HOST_IP || (await internalIpV4()) || "localhost";
-
-  process.env.RETICULUM_SERVER = host;
-  process.env.SHORTLINK_DOMAIN = shortlink_domain;
-  process.env.CORS_PROXY_SERVER = `hubs.local:8080/cors-proxy`;
-  process.env.THUMBNAIL_SERVER = thumbnail_server;
-  process.env.NON_CORS_PROXY_DOMAINS = `${localIp},hubs.local,localhost`;
 
   return appConfig;
 }
@@ -226,66 +121,24 @@ module.exports = async (env, argv) => {
   // Load environment variables from .env files.
   // .env takes precedent over .defaults.env
   // Previously defined environment variables are not overwritten
-  dotenv.config({ path: ".env" });
-  dotenv.config({ path: ".defaults.env" });
-
-  let appConfig = undefined;
+  dotenv.config({ path: ".env." + argv.mode });
+  dotenv.config({ path: ".env.defaults" });
 
   /**
    * Initialize the Webpack build envrionment for the provided environment.
    */
-
-  if (argv.mode !== "production" || env.bundleAnalyzer) {
-    if (env.loadAppConfig || process.env.LOAD_APP_CONFIG) {
-      if (!env.localDev) {
-        // Load and set the app config and environment variables from the remote server.
-        // A Hubs Cloud server or dev.reticulum.io can be used.
-        appConfig = await fetchAppConfigAndEnvironmentVars();
-      }
-    } else {
-      if (!env.localDev) {
-        // Use the default app config with all features enabled.
-        appConfig = createDefaultAppConfig();
-      }
-    }
-
-    if (env.localDev) {
-      const localDevHost = "hubs.local";
-      // Local Dev Environment (npm run local)
-      Object.assign(process.env, {
-        HOST: localDevHost,
-        RETICULUM_SOCKET_SERVER: localDevHost,
-        CORS_PROXY_SERVER: "hubs-proxy.local:4000",
-        NON_CORS_PROXY_DOMAINS: `${localDevHost},dev.reticulum.io`,
-        BASE_ASSETS_PATH: `https://${localDevHost}:8080/`,
-        RETICULUM_SERVER: `${localDevHost}:4000`,
-        POSTGREST_SERVER: "",
-        ITA_SERVER: "",
-        UPLOADS_HOST: `https://${localDevHost}:4000`
-      });
-    }
-  }
+  // Use the default app config with all features enabled.
+  const appConfig = createDefaultAppConfig();
 
   // In production, the environment variables are defined in CI or loaded from ita and
   // the app config is injected into the head of the page by Reticulum.
 
-  const host = process.env.HOST_IP || env.localDev || env.remoteDev ? "hubs.local" : "localhost";
-
-  const liveReload = !!process.env.LIVE_RELOAD || false;
+  const liveReload = !!process.env.LIVE_RELOAD;
 
   const devServerHeaders = {
     "Access-Control-Allow-Origin": "*"
   };
 
-  // Behind and environment var for now pending further testing
-  if (process.env.DEV_CSP_SOURCE) {
-    const CSPResp = await fetch(`https://${process.env.DEV_CSP_SOURCE}/`);
-    const remoteCSP = CSPResp.headers.get("content-security-policy");
-    devServerHeaders["content-security-policy"] = remoteCSP;
-    // .replaceAll("connect-src", "connect-src https://example.com");
-  }
-
-  const internalHostname = process.env.INTERNAL_HOSTNAME || "hubs.local";
   return {
     cache: {
       type: "filesystem"
@@ -319,17 +172,8 @@ module.exports = async (env, argv) => {
     },
     entry: {
       support: path.join(__dirname, "src", "support.js"),
-      index: path.join(__dirname, "src", "index.js"),
       hub: path.join(__dirname, "src", "hub.js"),
       scene: path.join(__dirname, "src", "scene.js"),
-      avatar: path.join(__dirname, "src", "avatar.js"),
-      link: path.join(__dirname, "src", "link.js"),
-      discord: path.join(__dirname, "src", "discord.js"),
-      cloud: path.join(__dirname, "src", "cloud.js"),
-      signin: path.join(__dirname, "src", "signin.js"),
-      verify: path.join(__dirname, "src", "verify.js"),
-      tokens: path.join(__dirname, "src", "tokens.js"),
-      "whats-new": path.join(__dirname, "src", "whats-new.js"),
       "webxr-polyfill": path.join(__dirname, "src", "webxr-polyfill.js")
     },
     output: {
@@ -346,26 +190,17 @@ module.exports = async (env, argv) => {
         }
       },
       server: {
-        type: "https",
-        options: createHTTPSConfig()
+        type: "http",
       },
       host: "0.0.0.0",
       port: 8080,
-      allowedHosts: [host, internalHostname],
+      allowedHosts: ["localhost"],
       headers: devServerHeaders,
       hot: liveReload,
       liveReload: liveReload,
       historyApiFallback: {
         rewrites: [
-          { from: /^\/link/, to: "/link.html" },
-          { from: /^\/avatars/, to: "/avatar.html" },
           { from: /^\/scenes/, to: "/scene.html" },
-          { from: /^\/signin/, to: "/signin.html" },
-          { from: /^\/discord/, to: "/discord.html" },
-          { from: /^\/cloud/, to: "/cloud.html" },
-          { from: /^\/verify/, to: "/verify.html" },
-          { from: /^\/tokens/, to: "/tokens.html" },
-          { from: /^\/whats-new/, to: "/whats-new.html" }
         ]
       },
       setupMiddlewares: (middlewares, { app }) => {
@@ -647,11 +482,6 @@ module.exports = async (env, argv) => {
       }),
       // Each output page needs a HTMLWebpackPlugin entry
       htmlPagePlugin({
-        filename: "index.html",
-        extraChunks: ["support"],
-        chunksSortMode: "manual"
-      }),
-      htmlPagePlugin({
         filename: "hub.html",
         extraChunks: ["webxr-polyfill", "support"],
         chunksSortMode: "manual",
@@ -663,50 +493,11 @@ module.exports = async (env, argv) => {
         chunksSortMode: "manual",
         inject: "head"
       }),
-      htmlPagePlugin({
-        filename: "avatar.html",
-        extraChunks: ["support"],
-        chunksSortMode: "manual",
-        inject: "head"
-      }),
-      htmlPagePlugin({
-        filename: "link.html",
-        extraChunks: ["support"],
-        chunksSortMode: "manual"
-      }),
-      htmlPagePlugin({
-        filename: "discord.html"
-      }),
-      htmlPagePlugin({
-        filename: "whats-new.html",
-        inject: "head"
-      }),
-      htmlPagePlugin({
-        filename: "cloud.html",
-        inject: "head"
-      }),
-      htmlPagePlugin({
-        filename: "signin.html"
-      }),
-      htmlPagePlugin({
-        filename: "verify.html"
-      }),
-      htmlPagePlugin({
-        filename: "tokens.html"
-      }),
       new CopyWebpackPlugin({
         patterns: [
           {
             from: "src/hub.service.js",
             to: "hub.service.js"
-          }
-        ]
-      }),
-      new CopyWebpackPlugin({
-        patterns: [
-          {
-            from: "src/schema.toml",
-            to: "schema.toml"
           }
         ]
       }),
@@ -720,6 +511,8 @@ module.exports = async (env, argv) => {
           NODE_ENV: argv.mode,
           SHORTLINK_DOMAIN: process.env.SHORTLINK_DOMAIN,
           RETICULUM_SERVER: process.env.RETICULUM_SERVER,
+          BACKEND_SERVER: process.env.BACKEND_SERVER,
+          BACKEND_ENDPOINT_PERMISSIONS: process.env.BACKEND_ENDPOINT_PERMISSIONS,
           RETICULUM_SOCKET_SERVER: process.env.RETICULUM_SOCKET_SERVER,
           THUMBNAIL_SERVER: process.env.THUMBNAIL_SERVER,
           CORS_PROXY_SERVER: process.env.CORS_PROXY_SERVER,

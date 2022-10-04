@@ -26,7 +26,6 @@ export function updateSceneCopresentState(presence, scene) {
 }
 
 export function createHubChannelParams({
-  permsToken,
   profile,
   pushSubscriptionEndpoint,
   isMobile,
@@ -39,7 +38,6 @@ export function createHubChannelParams({
     profile,
     push_subscription_endpoint: pushSubscriptionEndpoint,
     auth_token: authToken || null,
-    perms_token: permsToken || null,
     context: {
       mobile: isMobile || isMobileVR,
       embed: isEmbed,

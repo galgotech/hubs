@@ -62,14 +62,7 @@ export function MediaBrowser({
       }
       headerCenter={
         <>
-          {selectedSource === "favorites" ? (
-            <>
-              <StarIcon className={styles.favoriteIcon} />
-              <h3>
-                <FormattedMessage id="media-browser.favorites-header" defaultMessage="Favorite Rooms" />
-              </h3>
-            </>
-          ) : (
+          {
             <TextInputField
               value={query}
               onChange={onChangeQuery}
@@ -85,7 +78,7 @@ export function MediaBrowser({
               }
               description={searchDescription}
             />
-          )}
+          }
         </>
       }
       headerRight={headerRight}

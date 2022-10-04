@@ -77,8 +77,8 @@ export async function getReticulumMeta() {
         phx_host: document.querySelector("meta[name='ret:phx_host']").getAttribute("value")
       };
     } else {
-      await fetch(getReticulumFetchUrl("/api/v1/meta")).then(async res => {
-        reticulumMeta = await res.json();
+      await fetchReticulumAuthenticated("/api/v1/meta").then(async res => {
+        reticulumMeta = res;
       });
     }
   }
@@ -175,6 +175,30 @@ export function getLandingPageForPhoto(photoUrl) {
 export function fetchReticulumAuthenticated(url, method = "GET", payload) {
   const { token } = window.APP.store.state.credentials;
   const retUrl = getReticulumFetchUrl(url);
+  const params = {
+    headers: { "content-type": "application/json" },
+    method
+  };
+  if (token) {
+    params.headers.authorization = `bearer ${token}`;
+  }
+  if (payload) {
+    params.body = JSON.stringify(payload);
+  }
+  return fetch(retUrl, params).then(async r => {
+    const result = await r.text();
+    try {
+      return JSON.parse(result);
+    } catch (e) {
+      // Some reticulum responses, particularly DELETE requests, don't return json.
+      return result;
+    }
+  });
+}
+
+export function fetchBackendAuthenticated(url, method = "GET", payload) {
+  const { token } = window.APP.store.state.credentials;
+  const retUrl = `${configs.BACKEND_SERVER}${url}`;
   const params = {
     headers: { "content-type": "application/json" },
     method

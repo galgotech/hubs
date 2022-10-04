@@ -2,35 +2,15 @@ import React from "react";
 import PropTypes from "prop-types";
 
 import styles from "../assets/stylesheets/presence-log.scss";
-import configs from "../utils/configs";
-import classNames from "classnames";
 
-import { share } from "../utils/share";
 import { getLandingPageForPhoto } from "../utils/phoenix-utils";
-import { FormattedMessage, useIntl } from "react-intl";
+import { FormattedMessage } from "react-intl";
 
 export default function PhotoMessage({ name, body: { src: url }, className, maySpawn, hubId }) {
-  const intl = useIntl();
-
   const landingPageUrl = getLandingPageForPhoto(url);
-
-  const onShareClicked = share.bind(null, {
-    url: landingPageUrl,
-    title: intl.formatMessage(
-      {
-        id: "photo-message.default-tweet",
-        defaultMessage: "Taken in {shareHashtag}"
-      },
-      {
-        shareHashtag: configs.translation("share-hashtag"),
-        url: `https://${configs.SHORTLINK_DOMAIN}/${hubId}`
-      }
-    )
-  });
 
   return (
     <div className={className}>
-      {maySpawn && <button className={classNames(styles.iconButton, styles.share)} onClick={onShareClicked} />}
       <div className={styles.mediaBody}>
         <FormattedMessage
           id="photo-message.body"

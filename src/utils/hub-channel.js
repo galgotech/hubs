@@ -1,8 +1,6 @@
-import jwtDecode from "jwt-decode";
 import { EventTarget } from "event-target-shim";
 import { Presence } from "phoenix";
-import { migrateChannelToSocket, discordBridgesForPresences, migrateToChannel } from "./phoenix-utils";
-import configs from "./configs";
+import { migrateChannelToSocket, discordBridgesForPresences, migrateToChannel, fetchBackendAuthenticated } from "./phoenix-utils";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const MS_PER_MONTH = 1000 * 60 * 60 * 24 * 30;
@@ -26,7 +24,6 @@ const HUB_CREATOR_PERMISSIONS = [
   "amplify_audio"
 ];
 const VALID_PERMISSIONS = HUB_CREATOR_PERMISSIONS.concat([
-  "tweet",
   "spawn_camera",
   "spawn_drawing",
   "spawn_and_move_media",
@@ -138,7 +135,7 @@ export default class HubChannel extends EventTarget {
     this.presence = new Presence(this.channel);
     this.hubId = data.hubs[0].hub_id;
 
-    this.setPermissionsFromToken(data.perms_token);
+    await this.fetchPermissions()
 
     if (presenceBindings) {
       this.presence.onJoin(presenceBindings.onJoin);
@@ -148,15 +145,12 @@ export default class HubChannel extends EventTarget {
     return data;
   }
 
-  setPermissionsFromToken = token => {
-    // Note: token is not verified.
-    this.token = token;
-    this._permissions = jwtDecode(token);
-    configs.setIsAdmin(this._permissions.postgrest_role === "ret_admin");
+  setPermissionsFromToken = permissions => {
+    this._permissions = permissions;
     this.dispatchEvent(new CustomEvent("permissions_updated"));
 
     // Refresh the token 1 minute before it expires.
-    const nextRefresh = new Date(this._permissions.exp * 1000 - 60 * 1000) - new Date();
+    const nextRefresh = new Date(5 * 60 * 1000 - 60 * 1000) - new Date();
     if (this.fetchPermissionsTimeout) {
       clearTimeout(this.fetchPermissionsTimeout);
     }
@@ -328,30 +322,6 @@ export default class HubChannel extends EventTarget {
     return creatorAssignmentTokenEntry && creatorAssignmentTokenEntry.creatorAssignmentToken;
   };
 
-  signIn = token => {
-    return new Promise((resolve, reject) => {
-      const creator_assignment_token = this._getCreatorAssignmentToken();
-
-      this.channel
-        .push("sign_in", { token, creator_assignment_token })
-        .receive("ok", ({ perms_token }) => {
-          this.setPermissionsFromToken(perms_token);
-          this._signedIn = true;
-          resolve();
-        })
-        .receive("error", err => {
-          if (err.reason === "invalid_token") {
-            console.warn("sign in failed", err);
-            // Token expired or invalid TODO purge from storage if possible
-            resolve();
-          } else {
-            console.error("sign in failed", err);
-            reject();
-          }
-        });
-    });
-  };
-
   signOut = () => {
     return new Promise((resolve, reject) => {
       this.channel
@@ -360,7 +330,6 @@ export default class HubChannel extends EventTarget {
           this._signedIn = false;
           const params = this.channel.params();
           delete params.auth_token;
-          delete params.perms_token;
           await this.fetchPermissions();
           resolve();
         })
@@ -376,17 +345,6 @@ export default class HubChannel extends EventTarget {
           resolve(res);
         })
         .receive("error", reject);
-    });
-  };
-
-  getTwitterOAuthURL = () => {
-    return new Promise((resolve, reject) => {
-      this.channel
-        .push("oauth", { type: "twitter" })
-        .receive("ok", res => {
-          resolve(res.oauth_url);
-        })
-        .receive("error", err => reject(new Error(err.reason)));
     });
   };
 
@@ -420,13 +378,12 @@ export default class HubChannel extends EventTarget {
 
   fetchPermissions = () => {
     return new Promise((resolve, reject) => {
-      this.channel
-        .push("refresh_perms_token")
-        .receive("ok", res => {
-          this.setPermissionsFromToken(res.perms_token);
-          resolve({ permsToken: res.perms_token, permissions: this._permissions });
-        })
-        .receive("error", reject);
+      fetchBackendAuthenticated(process.env.BACKEND_ENDPOINT_PERMISSIONS).then(
+        (me) => {
+          this.setPermissionsFromToken(me.permissions);
+          resolve({ permsToken: me.permissions, permissions: this._permissions });
+        }
+      ).reject(reject);
     });
   };
 
@@ -456,10 +413,6 @@ export default class HubChannel extends EventTarget {
     APP.dialog.kick(sessionId);
     this.channel.push("kick", { session_id: sessionId });
   };
-
-  requestSupport = () => this.channel.push("events:request_support", {});
-  favorite = () => this.channel.push("favorite", {});
-  unfavorite = () => this.channel.push("unfavorite", {});
 
   disconnect = () => {
     if (this.channel) {

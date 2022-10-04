@@ -7,9 +7,10 @@ import { getLocale, getMessage } from "./i18n";
 
 // Read configs from global variable if available, otherwise use the process.env injected from build.
 const configs = {};
-let isAdmin = false;
 [
   "RETICULUM_SERVER",
+  "BACKEND_SERVER",
+  "BACKEND_ENDPOINT_PERMISSIONS",
   "THUMBNAIL_SERVER",
   "CORS_PROXY_SERVER",
   "NON_CORS_PROXY_DOMAINS",
@@ -19,8 +20,7 @@ let isAdmin = false;
   "BASE_ASSETS_PATH",
   "UPLOADS_HOST"
 ].forEach(x => {
-  const el = document.querySelector(`meta[name='env:${x.toLowerCase()}']`);
-  configs[x] = el ? el.getAttribute("content") : process.env[x];
+  configs[x] = process.env[x];
 
   const BASE_ASSETS_PATH_KEY = "BASE_ASSETS_PATH";
   if (x === BASE_ASSETS_PATH_KEY && configs[BASE_ASSETS_PATH_KEY]) {
@@ -35,10 +35,6 @@ let isAdmin = false;
     __webpack_public_path__ = configs[BASE_ASSETS_PATH_KEY];
   }
 });
-
-// Custom clients do not use <meta> tags for passing data, so if thumbnail_server meta tag exists, it is not a custom client
-const hasThumbnailServerMetaTag = !!document.querySelector("meta[name='env:thumbnail_server']");
-configs.IS_LOCAL_OR_CUSTOM_CLIENT = !hasThumbnailServerMetaTag;
 
 // Also include configs that reticulum injects as a script in the page head.
 
@@ -74,13 +70,7 @@ if (window.APP_CONFIG) {
 const isLocalDevelopment = process.env.NODE_ENV === "development";
 
 configs.feature = featureName => {
-  const value = configs.APP_CONFIG && configs.APP_CONFIG.features && configs.APP_CONFIG.features[featureName];
-  if (typeof value === "boolean" || featureName === "enable_spoke") {
-    const forceEnableSpoke = featureName === "enable_spoke" && isAdmin;
-    return forceEnableSpoke || value;
-  } else {
-    return value;
-  }
+  return configs.APP_CONFIG && configs.APP_CONFIG.features && configs.APP_CONFIG.features[featureName];
 };
 
 let localDevImages = {};
@@ -104,11 +94,6 @@ configs.image = (imageName, cssUrl) => {
 configs.link = (linkName, defaultValue) => {
   return (configs.APP_CONFIG && configs.APP_CONFIG.links && configs.APP_CONFIG.links[linkName]) || defaultValue;
 };
-
-configs.setIsAdmin = _isAdmin => {
-  isAdmin = _isAdmin;
-};
-configs.isAdmin = () => isAdmin;
 
 configs.integration = integration => {
   const availableIntegrations = configs.AVAILABLE_INTEGRATIONS;

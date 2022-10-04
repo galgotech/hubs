@@ -19,7 +19,7 @@ function unloadRoomObjects() {
 
 function loadRoomObjects(hubId) {
   const objectsScene = document.querySelector("#objects-scene");
-  const objectsUrl = getReticulumFetchUrl(`/${hubId}/objects.gltf`);
+  const objectsUrl = getReticulumFetchUrl(`/room/${hubId}/objects.gltf`);
   const objectsEl = document.createElement("a-entity");
   objectsEl.setAttribute("gltf-model-plus", { src: objectsUrl, useCache: false, inflate: true });
   objectsScene.appendChild(objectsEl);
@@ -56,7 +56,7 @@ export async function changeHub(hubId, addToHistory = true) {
   APP.subscriptions.setSubscribed(data.subscriptions.web_push);
 
   remountUI({
-    hubIsBound: data.hub_requires_oauth,
+    hubIsBound: true,
     initialIsFavorited: data.subscriptions.favorites
   });
 

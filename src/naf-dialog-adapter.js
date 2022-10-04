@@ -744,7 +744,7 @@ export class DialogAdapter extends EventEmitter {
       device: this._device,
       rtpCapabilities: this._mediasoupDevice.rtpCapabilities,
       sctpCapabilities: this._useDataChannel ? this._mediasoupDevice.sctpCapabilities : undefined,
-      token: APP.hubChannel.token
+      token: window.APP.store.state.credentials.token,
     });
 
     if (this._localMediaStream) {

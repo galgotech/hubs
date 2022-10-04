@@ -6,9 +6,7 @@ import { Button } from "../input/Button";
 import { ReactComponent as EnterIcon } from "../icons/Enter.svg";
 import { ReactComponent as VRIcon } from "../icons/VR.svg";
 import { ReactComponent as ShowIcon } from "../icons/Show.svg";
-import { ReactComponent as SettingsIcon } from "../icons/Settings.svg";
 import styles from "./RoomEntryModal.scss";
-import styleUtils from "../styles/style-utils.scss";
 import { useCssBreakpoints } from "react-use-css-breakpoints";
 import { Column } from "../layout/Column";
 import { AppLogo } from "../misc/AppLogo";
@@ -23,7 +21,6 @@ export function RoomEntryModal({
   onEnterOnDevice,
   showSpectate,
   onSpectate,
-  showOptions,
   onOptions,
   ...rest
 }) {
@@ -38,9 +35,6 @@ export function RoomEntryModal({
             </div>
           )}
         <div className={styles.roomName}>
-          <h5>
-            <FormattedMessage id="room-entry-modal.room-name-label" defaultMessage="Room Name" />
-          </h5>
           <p>{roomName}</p>
         </div>
         <Column center className={styles.buttons}>
@@ -68,18 +62,6 @@ export function RoomEntryModal({
               </span>
             </Button>
           )}
-          {showOptions &&
-            breakpoint !== "sm" && (
-              <>
-                <hr className={styleUtils.showLg} />
-                <Button preset="transparent" className={styleUtils.showLg} onClick={onOptions}>
-                  <SettingsIcon />
-                  <span>
-                    <FormattedMessage id="room-entry-modal.options-button" defaultMessage="Options" />
-                  </span>
-                </Button>
-              </>
-            )}
         </Column>
       </Column>
     </Modal>
@@ -95,7 +77,6 @@ RoomEntryModal.propTypes = {
   onEnterOnDevice: PropTypes.func,
   showSpectate: PropTypes.bool,
   onSpectate: PropTypes.func,
-  showOptions: PropTypes.bool,
   onOptions: PropTypes.func
 };
 
@@ -103,5 +84,4 @@ RoomEntryModal.defaultProps = {
   showJoinRoom: true,
   showEnterOnDevice: true,
   showSpectate: true,
-  showOptions: true
 };

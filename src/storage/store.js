@@ -5,7 +5,7 @@ import jwtDecode from "jwt-decode";
 import { qsGet } from "../utils/qs_truthy.js";
 import detectMobile, { isAndroid, isMobileVR } from "../utils/is-mobile";
 
-const LOCAL_STORE_KEY = "___hubs_store";
+const LOCAL_STORE_KEY = "___store";
 const STORE_STATE_CACHE_KEY = Symbol();
 const OAUTH_FLOW_CREDENTIALS_KEY = "ret-oauth-flow-account-credentials";
 const validator = new Validator();

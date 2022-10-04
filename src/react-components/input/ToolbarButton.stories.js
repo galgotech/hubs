@@ -4,8 +4,6 @@ import { ReactComponent as InviteIcon } from "../icons/Invite.svg";
 import { ReactComponent as MicrophoneIcon } from "../icons/Microphone.svg";
 import { ReactComponent as ArrowIcon } from "../icons/Arrow.svg";
 import { ReactComponent as ShareIcon } from "../icons/Share.svg";
-import { ReactComponent as ObjectIcon } from "../icons/Object.svg";
-import { ReactComponent as ReactionIcon } from "../icons/Reaction.svg";
 import { ReactComponent as ChatIcon } from "../icons/Chat.svg";
 import { ReactComponent as LeaveIcon } from "../icons/Leave.svg";
 import { ReactComponent as MoreIcon } from "../icons/More.svg";
@@ -62,10 +60,6 @@ export const RoomToolbar = () => (
             statusColor={"enabled"}
           />
         </div>
-        <ToolbarButton icon={<ShareIcon />} label="Share" preset="accent5" />
-        <ToolbarButton icon={<ObjectIcon />} label="Place" preset="accent3" />
-        <ToolbarButton icon={<ReactionIcon />} label="React" preset="accent2" />
-        <ToolbarButton icon={<ChatIcon />} label="Chat" preset="accent4" />
       </>
     }
     toolbarRight={
