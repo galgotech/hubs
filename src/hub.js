@@ -569,8 +569,6 @@ function handleHubChannelJoined(entryManager, hubChannel, messageDispatch, data)
 
       updateEnvironmentForHub(hub, entryManager);
 
-      console.log("ddd", data);
-
       // Disconnect in case this is a re-entry
       APP.dialog.disconnect();
       APP.dialog.connect({

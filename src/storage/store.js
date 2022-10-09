@@ -5,7 +5,7 @@ import jwtDecode from "jwt-decode";
 import { qsGet } from "../utils/qs_truthy.js";
 import detectMobile, { isAndroid, isMobileVR } from "../utils/is-mobile";
 
-const LOCAL_STORE_KEY = "___store";
+const LOCAL_STORE_KEY = "___store_scene";
 const STORE_STATE_CACHE_KEY = Symbol();
 const OAUTH_FLOW_CREDENTIALS_KEY = "ret-oauth-flow-account-credentials";
 const validator = new Validator();
@@ -13,6 +13,7 @@ import { EventTarget } from "event-target-shim";
 import { fetchRandomDefaultAvatarId, generateRandomName } from "../utils/identity.js";
 import { NO_DEVICE_ID } from "../utils/media-devices-utils.js";
 import { getDefaultTheme } from "../utils/theme.js";
+import configs from "../utils/configs.js";
 
 const defaultMaterialQuality = (function() {
   const MATERIAL_QUALITY_OPTIONS = ["low", "medium", "high"];
@@ -75,6 +76,7 @@ export const SCHEMA = {
       additionalProperties: false,
       properties: {
         token: { type: ["null", "string"] },
+        refreshToken: { type: ["null", "string"] },
         email: { type: ["null", "string"] }
       }
     },
@@ -276,12 +278,14 @@ export default class Store extends EventTarget {
 
     const oauthFlowCredentials = Cookies.getJSON(OAUTH_FLOW_CREDENTIALS_KEY);
     if (oauthFlowCredentials) {
-      this.update({ credentials: oauthFlowCredentials });
+      this.update({ credentials: { token: oauthFlowCredentials.token, refreshToken: oauthFlowCredentials.refreshToken } });
       this._shouldResetAvatarOnInit = true;
       Cookies.remove(OAUTH_FLOW_CREDENTIALS_KEY);
     }
 
     this._signOutOnExpiredAuthToken();
+
+    this._refreshAccesstoken();
 
     const maybeDispatchThemeChanged = (() => {
       let previous;
@@ -304,6 +308,25 @@ export default class Store extends EventTarget {
       this.update({ credentials: { token: null, email: null } });
     }
   };
+
+  _refreshAccesstoken = () => {
+    const interval = 3 * 60 * 1000;
+    if (!this.state.credentials.token) return;
+
+    const refreshToken = async () => {
+      const response = await fetch(`${configs.BACKEND_SERVER}${configs.BACKEND_ENDPOINT_REFRESH_ACCESS_TOKEN}`, {
+        method: "POST",
+        headers: new Headers({
+          "content-type": "application/json",
+          "Authorization": `Bearer ${this.state.credentials.refreshToken}`,
+        }),
+      });
+      const data = await response.json();
+      this.update({ credentials: { token: data.token, refreshToken: data.refreshToken } });
+      setTimeout(refreshToken, interval);
+    };
+    setTimeout(refreshToken, interval);
+  }
 
   initProfile = async () => {
     if (this._shouldResetAvatarOnInit) {
