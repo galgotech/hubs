@@ -121,7 +121,7 @@ module.exports = async (env, argv) => {
   // Load environment variables from .env files.
   // .env takes precedent over .defaults.env
   // Previously defined environment variables are not overwritten
-  dotenv.config({ path: ".env." + argv.mode });
+  dotenv.config({ path: ".env." + process.env.ENV });
   dotenv.config({ path: ".env.defaults" });
 
   /**
@@ -508,7 +508,7 @@ module.exports = async (env, argv) => {
       // Define process.env variables in the browser context.
       new webpack.DefinePlugin({
         "process.env": JSON.stringify({
-          NODE_ENV: argv.mode,
+          NODE_ENV: process.env.ENV,
           SHORTLINK_DOMAIN: process.env.SHORTLINK_DOMAIN,
           RETICULUM_SERVER: process.env.RETICULUM_SERVER,
           SIGNIN: process.env.SIGNIN,
