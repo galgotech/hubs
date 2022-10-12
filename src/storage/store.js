@@ -278,7 +278,7 @@ export default class Store extends EventTarget {
 
     const oauthFlowCredentials = Cookies.getJSON(OAUTH_FLOW_CREDENTIALS_KEY);
     if (oauthFlowCredentials) {
-      this.update({ credentials: { token: oauthFlowCredentials.token, refreshToken: oauthFlowCredentials.refreshToken } });
+      this.update({ credentials: { token: oauthFlowCredentials.token, refreshToken: oauthFlowCredentials.refreshToken, email: oauthFlowCredentials.email } });
       this._shouldResetAvatarOnInit = true;
       Cookies.remove(OAUTH_FLOW_CREDENTIALS_KEY);
     }
@@ -305,7 +305,7 @@ export default class Store extends EventTarget {
 
     const expiry = jwtDecode(this.state.credentials.token).exp * 1000;
     if (expiry <= Date.now()) {
-      this.update({ credentials: { token: null, email: null } });
+      this.update({ credentials: { token: null, refreshToken: null, email: null } });
     }
   };
 
@@ -322,7 +322,7 @@ export default class Store extends EventTarget {
         }),
       });
       const data = await response.json();
-      this.update({ credentials: { token: data.token, refreshToken: data.refreshToken } });
+      this.update({ credentials: { token: data.token, refreshToken: data.refreshToken, email: data.email } });
       setTimeout(refreshToken, interval);
     };
     setTimeout(refreshToken, interval);
